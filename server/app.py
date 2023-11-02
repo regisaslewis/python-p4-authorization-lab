@@ -41,7 +41,8 @@ class ShowArticle(Resource):
         article_json = article.to_dict()
 
         if not session.get('user_id'):
-            session['page_views'] = 0 if not session.get('page_views') else session.get('page_views')
+            session['page_views'] = 0 
+            # if not session.get('page_views') else session.get('page_views')
             session['page_views'] += 1
 
             if session['page_views'] <= 3:
@@ -84,15 +85,28 @@ class CheckSession(Resource):
         
         return {}, 401
 
+@app.before_request
+def check_membership():
+    if (request.endpoint == "member_index" or request.endpoint == "member_article") and not session["user_id"]:
+        return {"message": "Only for members who are logged in."}, 401
+
 class MemberOnlyIndex(Resource):
     
     def get(self):
-        pass
+        member_articles = [n.to_dict() for n in Article.query.filter(Article.is_member_only).all()]
+
+        return make_response(jsonify(member_articles), 200)
 
 class MemberOnlyArticle(Resource):
     
     def get(self, id):
-        pass
+        if Article.query.filter_by(id = id).first():
+            if Article.query.filter_by(id = id).first().is_member_only:
+                member_article = Article.query.filter_by(id = id).first()
+
+                return member_article.to_dict(), 200
+            return {"message": "Not a members only article"}, 404
+        return {"message": f"Article #{id} not found."}
 
 api.add_resource(ClearSession, '/clear', endpoint='clear')
 api.add_resource(IndexArticle, '/articles', endpoint='article_list')
